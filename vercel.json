@@ -1,5 +1,8 @@
 {
   "version": 2,
+  "buildCommand": "corepack enable && corepack prepare pnpm@10.4.1 --activate && pnpm build",
+  "installCommand": "corepack enable && corepack prepare pnpm@10.4.1 --activate && pnpm install",
+  "framework": null,
   "builds": [
     {
       "src": "package.json",
