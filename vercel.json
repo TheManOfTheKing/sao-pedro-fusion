@@ -9,7 +9,7 @@
     }
   ],
   "functions": {
-    "api/serverless.ts": {
+    "api/serverless.*": {
       "memory": 1024,
       "maxDuration": 10
     }
