@@ -1,17 +1,17 @@
 {
-  "version": 2,
+  "buildCommand": "pnpm install && pnpm build",
+  "outputDirectory": "client/dist",
   "framework": null,
-  "routes": [
+  "rewrites": [
     {
-      "src": "/api/trpc/(.*)",
-      "dest": "/server/_core/index.ts"
-    },
-    {
-      "handle": "filesystem"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/client/dist/$1"
+      "source": "/api/(.*)",
+      "destination": "/api/serverless"
     }
-  ]
+  ],
+  "functions": {
+    "api/serverless.ts": {
+      "memory": 1024,
+      "maxDuration": 10
+    }
+  }
 }

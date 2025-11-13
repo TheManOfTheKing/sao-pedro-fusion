@@ -1,45 +1,67 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
+import { Route, Switch, Redirect } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { AuthProvider, useSupabaseAuth } from "./contexts/AuthContext";
+import Login from "./pages/Login";
+import Dashboard from "./pages/Dashboard";
 import LanguageSelector from "./pages/LanguageSelector";
 import Menu from "./pages/Menu";
 import Admin from "./pages/Admin";
-import Landing from "./pages/Landing";
+
+function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
+  const { user, loading } = useSupabaseAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">Carregando...</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Redirect to="/" />;
+  }
+
+  return <Component />;
+}
 
 function Router() {
-  // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
-      <Route path={"/"} component={Landing} />
+      {/* Public Routes */}
+      <Route path="/" component={Login} />
       <Route path="/menu" component={LanguageSelector} />
       <Route path="/menu/:language" component={Menu} />
-      <Route path="/admin" component={Admin} />
-      <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
+
+      {/* Protected Routes */}
+      <Route path="/dashboard">
+        {() => <ProtectedRoute component={Dashboard} />}
+      </Route>
+      <Route path="/admin">
+        {() => <ProtectedRoute component={Admin} />}
+      </Route>
+
+      {/* 404 */}
+      <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>
   );
 }
 
-// NOTE: About Theme
-// - First choose a default theme according to your design style (dark or light bg), than change color palette in index.css
-//   to keep consistent foreground/background color across components
-// - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
-
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider
-        defaultTheme="light"
-        // switchable
-      >
-        <TooltipProvider>
-          <Toaster />
-          <Router />
-        </TooltipProvider>
+      <ThemeProvider defaultTheme="light">
+        <AuthProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Router />
+          </TooltipProvider>
+        </AuthProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );

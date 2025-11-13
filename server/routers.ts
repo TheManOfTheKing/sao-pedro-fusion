@@ -1,422 +1,353 @@
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
-import { translateMenuItem } from "./_core/translation";
 import { z } from "zod";
-import * as db from "./db";
+import * as supabase from "./supabase";
+import type { MenuLanguage, CategoryWithItems, MenuItemWithTranslations } from "@shared/types";
 
 export const appRouter = router({
-    // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
   auth: router({
-    me: publicProcedure.query(opts => opts.ctx.user),
+    me: publicProcedure.query((opts) => opts.ctx.user),
+    logout: publicProcedure.mutation(() => {
+      // Logout is handled by Supabase on the client side
+      return {
+        success: true,
+      } as const;
+    }),
   }),
 
-  // Public menu router - accessible without authentication
+  // ========================================================================
+  // Public Menu Router - Accessible without authentication
+  // ========================================================================
   menu: router({
-    // Get active languages
-    getActiveLanguages: publicProcedure
-      .query(async () => {
-        return await db.getActiveLanguages();
-      }),
-    
     // Get all categories with optional translations
     getCategories: publicProcedure
-      .input(z.object({ language: z.enum(["pt", "en", "es", "fr", "de", "it"]).optional() }).optional())
+      .input(
+        z
+          .object({
+            language: z.enum(["pt", "en", "es", "fr", "de", "it"]).optional(),
+          })
+          .optional()
+      )
       .query(async ({ input }) => {
-        const categories = await db.getAllCategories();
-        
-        if (!input?.language || input.language === "pt") {
-          return categories.map(cat => ({
+        const categories = await supabase.getAllCategories();
+        const language = input?.language || "pt";
+
+        if (language === "pt") {
+          return categories.map((cat) => ({
             id: cat.id,
-            name: cat.namePt,
+            name: cat.name_pt,
             slug: cat.slug,
-            displayOrder: cat.displayOrder,
+            displayOrder: cat.display_order,
           }));
         }
-        
+
         // Get translations for each category
         const categoriesWithTranslations = await Promise.all(
           categories.map(async (cat) => {
-            const translations = await db.getTranslations("category", cat.id, input.language!);
-            const nameTranslation = translations.find(t => t.fieldName === "name");
-            
+            const translations = await supabase.getTranslations("category", cat.id, language);
+            const nameTranslation = translations.find((t) => t.field_name === "name");
+
             return {
               id: cat.id,
-              name: nameTranslation?.translatedText || cat.namePt,
+              name: nameTranslation?.translated_text || cat.name_pt,
               slug: cat.slug,
-              displayOrder: cat.displayOrder,
+              displayOrder: cat.display_order,
             };
           })
         );
-        
+
         return categoriesWithTranslations;
       }),
-    
-    // Get menu items by category with translations
-    getMenuByCategory: publicProcedure
-      .input(z.object({ 
-        categorySlug: z.string(),
-        language: z.enum(["pt", "en", "es", "fr", "de", "it"]).optional()
-      }))
-      .query(async ({ input }) => {
-        const category = await db.getCategoryBySlug(input.categorySlug);
-        if (!category) {
-          throw new Error("Category not found");
-        }
-        
-        const items = await db.getMenuItemsByCategory(category.id);
-        
-        if (!input.language || input.language === "pt") {
-          return items.map(item => ({
-            id: item.id,
-            name: item.namePt,
-            description: item.descriptionPt,
-            price: item.price,
-            imageUrl: item.imageUrl,
-            isVegetarian: item.isVegetarian,
-            isVegan: item.isVegan,
-            isGlutenFree: item.isGlutenFree,
-            isSpicy: item.isSpicy,
-            isFeatured: item.isFeatured,
-            isAvailable: item.isAvailable,
-          }));
-        }
-        
-        // Get translations for each item
-        const itemsWithTranslations = await Promise.all(
-          items.map(async (item) => {
-            const translations = await db.getTranslations("menu_item", item.id, input.language!);
-            const nameTranslation = translations.find(t => t.fieldName === "name");
-            const descTranslation = translations.find(t => t.fieldName === "description");
-            
-            return {
-              id: item.id,
-              name: nameTranslation?.translatedText || item.namePt,
-              description: descTranslation?.translatedText || item.descriptionPt,
-              price: item.price,
-              imageUrl: item.imageUrl,
-              isVegetarian: item.isVegetarian,
-              isVegan: item.isVegan,
-              isGlutenFree: item.isGlutenFree,
-              isSpicy: item.isSpicy,
-              isFeatured: item.isFeatured,
-              isAvailable: item.isAvailable,
-            };
-          })
-        );
-        
-        return itemsWithTranslations;
-      }),
-    
-    // Get complete menu (all categories with items)
+
+    // Get complete menu (all categories with items and translations)
     getCompleteMenu: publicProcedure
-      .input(z.object({ language: z.enum(["pt", "en", "es", "fr", "de", "it"]).optional() }).optional())
-      .query(async ({ input }) => {
-        const categories = await db.getAllCategories();
-        const allItems = await db.getAllMenuItems();
-        
+      .input(
+        z
+          .object({
+            language: z.enum(["pt", "en", "es", "fr", "de", "it"]).optional(),
+          })
+          .optional()
+      )
+      .query(async ({ input }): Promise<CategoryWithItems[]> => {
+        const categories = await supabase.getAllCategories();
+        const allItems = await supabase.getAllMenuItems();
         const language = input?.language || "pt";
-        
+
         const menuWithTranslations = await Promise.all(
           categories.map(async (cat) => {
-            const categoryItems = allItems.filter(item => item.categoryId === cat.id);
-            
+            const categoryItems = allItems.filter((item) => item.category_id === cat.id);
+
             // Get category translations
-            let categoryName = cat.namePt;
+            let categoryName = cat.name_pt;
             if (language !== "pt") {
-              const catTranslations = await db.getTranslations("category", cat.id, language);
-              const nameTranslation = catTranslations.find(t => t.fieldName === "name");
-              categoryName = nameTranslation?.translatedText || cat.namePt;
+              const catTranslations = await supabase.getTranslations("category", cat.id, language);
+              const nameTranslation = catTranslations.find((t) => t.field_name === "name");
+              categoryName = nameTranslation?.translated_text || cat.name_pt;
             }
-            
+
             // Get items with translations
-            const itemsWithTranslations = await Promise.all(
+            const itemsWithTranslations: MenuItemWithTranslations[] = await Promise.all(
               categoryItems.map(async (item) => {
-                let name = item.namePt;
-                let description = item.descriptionPt;
-                
+                let name = item.name_pt;
+                let description = item.description_pt;
+
                 if (language !== "pt") {
-                  const itemTranslations = await db.getTranslations("menu_item", item.id, language);
-                  const nameTranslation = itemTranslations.find(t => t.fieldName === "name");
-                  const descTranslation = itemTranslations.find(t => t.fieldName === "description");
-                  name = nameTranslation?.translatedText || item.namePt;
-                  description = descTranslation?.translatedText || item.descriptionPt;
+                  const itemTranslations = await supabase.getTranslations("menu_item", item.id, language);
+                  const nameTranslation = itemTranslations.find((t) => t.field_name === "name");
+                  const descTranslation = itemTranslations.find((t) => t.field_name === "description");
+                  name = nameTranslation?.translated_text || item.name_pt;
+                  description = descTranslation?.translated_text || item.description_pt;
                 }
-                
+
                 return {
                   id: item.id,
                   name,
                   description,
                   price: item.price,
-                  imageUrl: item.imageUrl,
-                  isVegetarian: item.isVegetarian,
-                  isVegan: item.isVegan,
-                  isGlutenFree: item.isGlutenFree,
-                  isSpicy: item.isSpicy,
-                  isFeatured: item.isFeatured,
-                  isAvailable: item.isAvailable,
-                  displayOrder: item.displayOrder,
+                  imageUrl: item.image_url,
+                  isVegetarian: item.is_vegetarian,
+                  isVegan: item.is_vegan,
+                  isGlutenFree: item.is_gluten_free,
+                  isSpicy: item.is_spicy,
+                  isFeatured: item.is_featured,
+                  isAvailable: item.is_available,
+                  displayOrder: item.display_order,
                 };
               })
             );
-            
+
             return {
               id: cat.id,
               name: categoryName,
               slug: cat.slug,
-              displayOrder: cat.displayOrder,
-              items: itemsWithTranslations.sort((a, b) => a.displayOrder - b.displayOrder),
+              displayOrder: cat.display_order,
+              items: itemsWithTranslations,
             };
           })
         );
-        
-        return menuWithTranslations.sort((a, b) => a.displayOrder - b.displayOrder);
+
+        return menuWithTranslations;
       }),
+
+    // Get active languages (public)
+    getActiveLanguages: publicProcedure.query(async () => {
+      return await supabase.getActiveLanguages();
+    }),
   }),
-  
-  // Admin router - requires authentication
+
+  // ========================================================================
+  // Admin Router - Protected procedures
+  // ========================================================================
   admin: router({
-    // Get active languages
-    getActiveLanguages: protectedProcedure
-      .query(async () => {
-        return await db.getActiveLanguages();
-      }),
-    
-    // Update active languages
-    updateActiveLanguages: protectedProcedure
-      .input(z.object({
-        languages: z.array(z.string()),
-      }))
-      .mutation(async ({ input }) => {
-        await db.updateActiveLanguages(input.languages);
-        return { success: true };
-      }),
-    
-    // Create category
-    createCategory: protectedProcedure
-      .input(z.object({
-        namePt: z.string(),
-        slug: z.string(),
-        displayOrder: z.number().optional(),
-      }))
-      .mutation(async ({ input }) => {
-        await db.createCategory({
-          namePt: input.namePt,
-          slug: input.slug,
-          displayOrder: input.displayOrder || 0,
-        });
-        return { success: true };
-      }),
-    
-    // Create menu item
+    // Create new menu item
     createMenuItem: protectedProcedure
-      .input(z.object({
-        categoryId: z.number(),
-        namePt: z.string(),
-        descriptionPt: z.string().optional(),
-        price: z.number(),
-        imageUrl: z.string().optional(),
-        isVegetarian: z.boolean().optional(),
-        isVegan: z.boolean().optional(),
-        isGlutenFree: z.boolean().optional(),
-        isSpicy: z.boolean().optional(),
-        isFeatured: z.boolean().optional(),
-        isAvailable: z.boolean().optional(),
-        displayOrder: z.number().optional(),
-        translations: z.array(z.object({
-          language: z.string(),
-          name: z.string(),
-          description: z.string(),
-        })).optional(),
-      }))
+      .input(
+        z.object({
+          categoryId: z.number(),
+          namePt: z.string().min(1),
+          descriptionPt: z.string().optional(),
+          price: z.number().int().positive(),
+          imageUrl: z.string().url().optional(),
+          isVegetarian: z.boolean().default(false),
+          isVegan: z.boolean().default(false),
+          isGlutenFree: z.boolean().default(false),
+          isSpicy: z.boolean().default(false),
+          isFeatured: z.boolean().default(false),
+          isAvailable: z.boolean().default(true),
+          displayOrder: z.number().int().default(0),
+          translations: z
+            .array(
+              z.object({
+                language: z.enum(["en", "es", "fr", "de", "it"]),
+                name: z.string().optional(),
+                description: z.string().optional(),
+              })
+            )
+            .optional(),
+        })
+      )
       .mutation(async ({ input }) => {
         const { translations, ...itemData } = input;
-        
-        const createdItem = await db.createMenuItem({
-          categoryId: itemData.categoryId,
-          namePt: itemData.namePt,
-          descriptionPt: itemData.descriptionPt,
+
+        // Create menu item
+        const newItem = await supabase.createMenuItem({
+          category_id: itemData.categoryId,
+          name_pt: itemData.namePt,
+          description_pt: itemData.descriptionPt || null,
           price: itemData.price,
-          imageUrl: itemData.imageUrl,
-          isVegetarian: itemData.isVegetarian ?? false,
-          isVegan: itemData.isVegan ?? false,
-          isGlutenFree: itemData.isGlutenFree ?? false,
-          isSpicy: itemData.isSpicy ?? false,
-          isFeatured: itemData.isFeatured ?? false,
-          isAvailable: itemData.isAvailable !== false,
-          displayOrder: itemData.displayOrder || 0,
+          image_url: itemData.imageUrl || null,
+          is_vegetarian: itemData.isVegetarian,
+          is_vegan: itemData.isVegan,
+          is_gluten_free: itemData.isGlutenFree,
+          is_spicy: itemData.isSpicy,
+          is_featured: itemData.isFeatured,
+          is_available: itemData.isAvailable,
+          display_order: itemData.displayOrder,
         });
-        
-        // Auto-translate if no translations provided or if translations array is empty
-        let translationsToSave = translations;
-        if (!translationsToSave || translationsToSave.length === 0) {
-          try {
-            const autoTranslations = await translateMenuItem(
-              itemData.namePt,
-              itemData.descriptionPt
-            );
-            translationsToSave = autoTranslations;
-          } catch (error) {
-            console.error("[Router] Error auto-translating menu item:", error);
-            // Continue without translations if auto-translation fails
-          }
-        }
-        
-        // Add translations
-        if (translationsToSave && translationsToSave.length > 0) {
-          for (const trans of translationsToSave) {
+
+        // Add translations if provided
+        if (translations && translations.length > 0) {
+          for (const trans of translations) {
             if (trans.name) {
-              await db.upsertTranslation({
-                entityType: "menu_item",
-                entityId: createdItem.id,
-                fieldName: "name",
+              await supabase.upsertTranslation({
+                entity_type: "menu_item",
+                entity_id: newItem.id,
+                field_name: "name",
                 language: trans.language,
-                translatedText: trans.name,
+                translated_text: trans.name,
               });
             }
             if (trans.description) {
-              await db.upsertTranslation({
-                entityType: "menu_item",
-                entityId: createdItem.id,
-                fieldName: "description",
+              await supabase.upsertTranslation({
+                entity_type: "menu_item",
+                entity_id: newItem.id,
+                field_name: "description",
                 language: trans.language,
-                translatedText: trans.description,
+                translated_text: trans.description,
               });
             }
           }
         }
-        
-        const item = await db.getMenuItemById(createdItem.id);
-        const itemTranslations = await db.getAllTranslationsForEntity("menu_item", createdItem.id);
 
-        return {
-          success: true,
-          item: {
-            ...item,
-            translations: itemTranslations,
-          },
-        };
+        return { success: true, itemId: newItem.id };
       }),
-    
-    // Update item availability
-    updateAvailability: protectedProcedure
-      .input(z.object({
-        itemId: z.number(),
-        isAvailable: z.boolean(),
-      }))
-      .mutation(async ({ input }) => {
-        await db.updateMenuItemAvailability(input.itemId, input.isAvailable);
-        return { success: true };
-      }),
-    
-    // Get menu item by ID
-    getMenuItem: protectedProcedure
-      .input(z.object({ itemId: z.number() }))
-      .query(async ({ input }) => {
-        const item = await db.getMenuItemById(input.itemId);
-        const translations = await db.getAllTranslationsForEntity("menu_item", input.itemId);
-        return {
-          ...item,
-          translations: translations.map(t => ({
-            language: t.language,
-            name: t.fieldName === "name" ? t.translatedText : "",
-            description: t.fieldName === "description" ? t.translatedText : "",
-          })),
-        };
-      }),
-    
+
     // Update menu item
     updateMenuItem: protectedProcedure
-      .input(z.object({
-        itemId: z.number(),
-        categoryId: z.number(),
-        namePt: z.string(),
-        descriptionPt: z.string().optional(),
-        price: z.number(),
-        imageUrl: z.string().optional(),
-        isVegetarian: z.boolean().optional(),
-        isVegan: z.boolean().optional(),
-        isGlutenFree: z.boolean().optional(),
-        isSpicy: z.boolean().optional(),
-        isFeatured: z.boolean().optional(),
-        isAvailable: z.boolean().optional(),
-        translations: z.array(z.object({
-          language: z.string(),
-          name: z.string(),
-          description: z.string(),
-        })).optional(),
-      }))
+      .input(
+        z.object({
+          id: z.number(),
+          categoryId: z.number().optional(),
+          namePt: z.string().min(1).optional(),
+          descriptionPt: z.string().optional(),
+          price: z.number().int().positive().optional(),
+          imageUrl: z.string().url().optional(),
+          isVegetarian: z.boolean().optional(),
+          isVegan: z.boolean().optional(),
+          isGlutenFree: z.boolean().optional(),
+          isSpicy: z.boolean().optional(),
+          isFeatured: z.boolean().optional(),
+          isAvailable: z.boolean().optional(),
+          displayOrder: z.number().int().optional(),
+          translations: z
+            .array(
+              z.object({
+                language: z.enum(["en", "es", "fr", "de", "it"]),
+                name: z.string().optional(),
+                description: z.string().optional(),
+              })
+            )
+            .optional(),
+        })
+      )
       .mutation(async ({ input }) => {
-        const { itemId, translations, ...itemData } = input;
-        
-        // Get existing item to check if name/description changed
-        const existingItem = await db.getMenuItemById(itemId);
-        const nameChanged = existingItem.namePt !== itemData.namePt;
-        const descriptionChanged = existingItem.descriptionPt !== (itemData.descriptionPt || "");
-        
-        await db.updateMenuItem(itemId, {
-          ...itemData,
-          isVegetarian: itemData.isVegetarian ?? false,
-          isVegan: itemData.isVegan ?? false,
-          isGlutenFree: itemData.isGlutenFree ?? false,
-          isSpicy: itemData.isSpicy ?? false,
-          isFeatured: itemData.isFeatured ?? false,
-          isAvailable: itemData.isAvailable ?? true,
-        });
-        
-        // Auto-translate if name or description changed and no translations provided
-        let translationsToSave = translations;
-        if ((nameChanged || descriptionChanged) && (!translationsToSave || translationsToSave.length === 0)) {
-          try {
-            const autoTranslations = await translateMenuItem(
-              itemData.namePt,
-              itemData.descriptionPt
-            );
-            translationsToSave = autoTranslations;
-          } catch (error) {
-            console.error("[Router] Error auto-translating menu item on update:", error);
-            // Continue without translations if auto-translation fails
-          }
+        const { id, translations, ...updates } = input;
+
+        // Update menu item
+        const updateData: any = {};
+        if (updates.categoryId !== undefined) updateData.category_id = updates.categoryId;
+        if (updates.namePt !== undefined) updateData.name_pt = updates.namePt;
+        if (updates.descriptionPt !== undefined) updateData.description_pt = updates.descriptionPt;
+        if (updates.price !== undefined) updateData.price = updates.price;
+        if (updates.imageUrl !== undefined) updateData.image_url = updates.imageUrl;
+        if (updates.isVegetarian !== undefined) updateData.is_vegetarian = updates.isVegetarian;
+        if (updates.isVegan !== undefined) updateData.is_vegan = updates.isVegan;
+        if (updates.isGlutenFree !== undefined) updateData.is_gluten_free = updates.isGlutenFree;
+        if (updates.isSpicy !== undefined) updateData.is_spicy = updates.isSpicy;
+        if (updates.isFeatured !== undefined) updateData.is_featured = updates.isFeatured;
+        if (updates.isAvailable !== undefined) updateData.is_available = updates.isAvailable;
+        if (updates.displayOrder !== undefined) updateData.display_order = updates.displayOrder;
+
+        if (Object.keys(updateData).length > 0) {
+          await supabase.updateMenuItem(id, updateData);
         }
-        
-        // Update translations
-        if (translationsToSave && translationsToSave.length > 0) {
-          for (const trans of translationsToSave) {
+
+        // Update translations if provided
+        if (translations && translations.length > 0) {
+          for (const trans of translations) {
             if (trans.name) {
-              await db.upsertTranslation({
-                entityType: "menu_item",
-                entityId: itemId,
-                fieldName: "name",
+              await supabase.upsertTranslation({
+                entity_type: "menu_item",
+                entity_id: id,
+                field_name: "name",
                 language: trans.language,
-                translatedText: trans.name,
+                translated_text: trans.name,
               });
             }
             if (trans.description) {
-              await db.upsertTranslation({
-                entityType: "menu_item",
-                entityId: itemId,
-                fieldName: "description",
+              await supabase.upsertTranslation({
+                entity_type: "menu_item",
+                entity_id: id,
+                field_name: "description",
                 language: trans.language,
-                translatedText: trans.description,
+                translated_text: trans.description,
               });
             }
           }
         }
-        
+
         return { success: true };
       }),
-    
-    // Add translation
-    addTranslation: protectedProcedure
-      .input(z.object({
-        entityType: z.enum(["category", "menu_item"]),
-        entityId: z.number(),
-        fieldName: z.enum(["name", "description"]),
-        language: z.enum(["en", "es", "fr", "de", "it"]),
-        translatedText: z.string(),
-      }))
+
+    // Delete menu item
+    deleteMenuItem: protectedProcedure
+      .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
-        await db.upsertTranslation(input);
+        await supabase.deleteMenuItem(input.id);
+        return { success: true };
+      }),
+
+    // Toggle availability
+    updateAvailability: protectedProcedure
+      .input(
+        z.object({
+          itemId: z.number(),
+          isAvailable: z.boolean(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        await supabase.updateMenuItemAvailability(input.itemId, input.isAvailable);
+        return { success: true };
+      }),
+
+    // Get item with all translations
+    getItemWithTranslations: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        const item = await supabase.getMenuItemById(input.id);
+        if (!item) {
+          throw new Error("Item not found");
+        }
+
+        const allTranslations = await supabase.getTranslations("menu_item", input.id);
+
+        return {
+          item,
+          translations: allTranslations,
+        };
+      }),
+
+    // Get active languages
+    getActiveLanguages: protectedProcedure.query(async () => {
+      try {
+        return await supabase.getActiveLanguages();
+      } catch (error) {
+        console.error("[tRPC] Error in getActiveLanguages:", error);
+        // Return default on error
+        return ["pt"];
+      }
+    }),
+
+    // Update active languages
+    updateActiveLanguages: protectedProcedure
+      .input(
+        z.object({
+          languages: z.array(z.enum(["pt", "en", "es", "fr", "de", "it"])),
+        })
+      )
+      .mutation(async ({ input }) => {
+        await supabase.updateActiveLanguages(input.languages);
         return { success: true };
       }),
   }),

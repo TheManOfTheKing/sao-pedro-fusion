@@ -105,9 +105,3 @@ temp/
 *.db
 *.sqlite
 *.sqlite3
-
-# Client build output
-client/dist/
-
-# Vercel
-.vercel/

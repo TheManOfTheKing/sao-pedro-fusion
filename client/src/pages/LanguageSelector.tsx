@@ -1,35 +1,32 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { APP_TITLE } from "@/const";
+import { APP_TITLE, LANGUAGES } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { Globe } from "lucide-react";
 import { useLocation } from "wouter";
-
-const allLanguages = [
-  { code: "pt", name: "Português", flag: "🇵🇹" },
-  { code: "en", name: "English", flag: "🇬🇧" },
-  { code: "es", name: "Español", flag: "🇪🇸" },
-  { code: "fr", name: "Français", flag: "🇫🇷" },
-  { code: "de", name: "Deutsch", flag: "🇩🇪" },
-  { code: "it", name: "Italiano", flag: "🇮🇹" },
-];
+import type { LanguageCode } from "@/const";
 
 export default function LanguageSelector() {
   const [, setLocation] = useLocation();
-  const { data: activeLanguages, isLoading } = trpc.menu.getActiveLanguages.useQuery();
   
-  // Filter languages to show only active ones
-  const languages = allLanguages.filter(lang => 
-    activeLanguages?.includes(lang.code) ?? true // Default to all if not loaded yet
-  );
+  const { data: activeLanguages, isLoading } = trpc.menu.getActiveLanguages.useQuery();
 
   const handleLanguageSelect = (languageCode: string) => {
     setLocation(`/menu/${languageCode}`);
   };
 
+  // Filter languages to show only active ones
+  const availableLanguages = LANGUAGES.filter((lang) => {
+    if (!activeLanguages || activeLanguages.length === 0) {
+      // Default to Portuguese if no active languages are set
+      return lang.code === "pt";
+    }
+    return activeLanguages.includes(lang.code as LanguageCode);
+  });
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/20 via-background to-secondary/20 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-primary/20 via-background to-accent/20 flex items-center justify-center p-4">
       <div className="container max-w-4xl">
         <Card className="bg-card/95 backdrop-blur-sm shadow-2xl border-2 border-accent/20">
           <div className="p-8 md:p-12 text-center space-y-8">
@@ -61,34 +58,36 @@ export default function LanguageSelector() {
             {/* Language Buttons */}
             {isLoading ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
-                {[1, 2, 3, 4].map((i) => (
-                  <Skeleton key={i} className="h-20" />
+                {[1, 2].map((i) => (
+                  <Skeleton key={i} className="h-20 w-full" />
                 ))}
               </div>
-            ) : languages.length > 0 ? (
+            ) : availableLanguages.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
-                {languages.map((language) => (
-                <Button
-                  key={language.code}
-                  onClick={() => handleLanguageSelect(language.code)}
-                  variant="outline"
-                  size="lg"
-                  className="h-auto py-6 px-6 border-2 hover:border-accent hover:bg-accent/10 hover:scale-105 transition-all duration-300 group"
-                >
-                  <div className="flex items-center gap-4 w-full">
-                    <span className="text-4xl group-hover:scale-110 transition-transform">
-                      {language.flag}
-                    </span>
-                    <span className="font-sans text-lg font-medium text-left flex-1">
-                      {language.name}
-                    </span>
-                  </div>
-                </Button>
+                {availableLanguages.map((language) => (
+                  <Button
+                    key={language.code}
+                    onClick={() => handleLanguageSelect(language.code)}
+                    variant="outline"
+                    size="lg"
+                    className="h-auto py-6 px-6 border-2 hover:border-accent hover:bg-accent/10 hover:scale-105 transition-all duration-300 group"
+                  >
+                    <div className="flex items-center gap-4 w-full">
+                      <span className="text-4xl group-hover:scale-110 transition-transform">
+                        {language.flag}
+                      </span>
+                      <span className="font-sans text-lg font-medium text-left flex-1">
+                        {language.name}
+                      </span>
+                    </div>
+                  </Button>
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">Nenhum idioma disponível no momento.</p>
+              <div className="pt-4 text-center">
+                <p className="text-muted-foreground">
+                  Nenhum idioma disponível no momento.
+                </p>
               </div>
             )}
 

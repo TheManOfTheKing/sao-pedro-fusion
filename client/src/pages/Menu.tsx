@@ -1,32 +1,18 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { APP_TITLE } from "@/const";
+import { Badge } from "@/components/ui/badge";
+import { APP_TITLE, LANGUAGES } from "@/const";
 import { trpc } from "@/lib/trpc";
-import {
-  ChevronLeft,
-  Leaf,
-  Flame,
-  WheatOff,
-  Star,
-  Globe,
-} from "lucide-react";
+import { Globe, Leaf, Flame, WheatOff, Star } from "lucide-react";
 import { useState } from "react";
 import { useLocation, useRoute } from "wouter";
-
-const languageNames: Record<string, string> = {
-  pt: "Português",
-  en: "English",
-  es: "Español",
-  fr: "Français",
-  de: "Deutsch",
-  it: "Italiano",
-};
+import type { LanguageCode } from "@/const";
 
 export default function Menu() {
   const [, params] = useRoute("/menu/:language");
   const [, setLocation] = useLocation();
-  const language = (params?.language || "pt") as "pt" | "en" | "es" | "fr" | "de" | "it";
+  const language = (params?.language || "pt") as LanguageCode;
 
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
@@ -40,7 +26,6 @@ export default function Menu() {
 
   const handleCategoryClick = (slug: string) => {
     setSelectedCategory(slug);
-    // Scroll to category
     const element = document.getElementById(`category-${slug}`);
     if (element) {
       element.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -50,6 +35,8 @@ export default function Menu() {
   const formatPrice = (priceInCents: number) => {
     return `€${(priceInCents / 100).toFixed(2)}`;
   };
+
+  const languageName = LANGUAGES.find((l) => l.code === language)?.name || "Português";
 
   if (isLoading) {
     return (
@@ -79,7 +66,7 @@ export default function Menu() {
               className="gap-2 text-muted-foreground hover:text-foreground"
             >
               <Globe className="w-4 h-4" />
-              <span className="hidden sm:inline">{languageNames[language]}</span>
+              <span className="hidden sm:inline">{languageName}</span>
             </Button>
 
             <h1 className="font-script text-2xl md:text-3xl text-primary text-center flex-1">
@@ -98,17 +85,11 @@ export default function Menu() {
             <div className="flex gap-2 overflow-x-auto py-3 scrollbar-hide">
               {menu.map((category) => (
                 <Button
-                  key={category.id}
-                  variant={selectedCategory === category.slug ? "secondary" : "ghost"}
-                  size="sm"
+                  key={category.slug}
                   onClick={() => handleCategoryClick(category.slug)}
-                  className={`
-                    whitespace-nowrap font-sans font-medium
-                    ${selectedCategory === category.slug 
-                      ? "bg-accent text-accent-foreground hover:bg-accent/90" 
-                      : "text-primary-foreground hover:bg-primary-foreground/10"
-                    }
-                  `}
+                  variant={selectedCategory === category.slug ? "default" : "ghost"}
+                  size="sm"
+                  className="whitespace-nowrap text-primary-foreground hover:bg-primary-foreground/20"
                 >
                   {category.name}
                 </Button>
@@ -122,148 +103,110 @@ export default function Menu() {
       <main className="container py-8 space-y-12">
         {menu && menu.length > 0 ? (
           menu.map((category) => (
-            <section
-              key={category.id}
-              id={`category-${category.slug}`}
-              className="scroll-mt-32"
-            >
-              {/* Category Title */}
-              <div className="mb-6">
-                <h2 className="font-display text-3xl md:text-4xl font-bold text-primary border-b-2 border-accent inline-block pb-2">
+            <section key={category.id} id={`category-${category.slug}`} className="space-y-6">
+              {/* Category Header */}
+              <div className="text-center space-y-2">
+                <h2 className="font-display text-3xl md:text-4xl font-bold text-primary">
                   {category.name}
                 </h2>
+                <div className="w-24 h-1 bg-accent mx-auto rounded-full" />
               </div>
 
               {/* Menu Items */}
-              <div className="grid gap-4 md:gap-6">
-                {category.items.length > 0 ? (
-                  category.items.map((item) => (
-                    <Card
-                      key={item.id}
-                      className={`
-                        overflow-hidden transition-all duration-300 hover:shadow-lg
-                        ${!item.isAvailable ? "opacity-60" : ""}
-                      `}
-                    >
-                      <CardContent className="p-0">
-                        <div className="flex flex-col sm:flex-row gap-4">
-                          {/* Image */}
-                          {item.imageUrl && (
-                            <div className="sm:w-48 h-48 sm:h-auto flex-shrink-0 bg-muted overflow-hidden">
-                              <img
-                                src={item.imageUrl}
-                                alt={item.name}
-                                className="w-full h-full object-cover"
-                                loading="lazy"
-                              />
-                            </div>
-                          )}
-
-                          {/* Content */}
-                          <div className="flex-1 p-4 sm:p-6 flex flex-col justify-between">
-                            <div className="space-y-2">
-                              {/* Title and Icons */}
-                              <div className="flex items-start justify-between gap-4">
-                                <h3 className="font-display text-xl md:text-2xl font-semibold text-foreground">
-                                  {item.name}
-                                  {!item.isAvailable && (
-                                    <span className="ml-2 text-sm font-sans font-normal text-destructive">
-                                      {language === "pt" ? "(Esgotado)" : "(Sold out)"}
-                                    </span>
-                                  )}
-                                </h3>
-                                <div className="flex gap-1 flex-shrink-0">
-                                  {item.isFeatured && (
-                                    <Star className="w-5 h-5 text-accent fill-accent" />
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* Description */}
-                              {item.description && (
-                                <p className="font-sans text-sm md:text-base text-muted-foreground leading-relaxed">
-                                  {item.description}
-                                </p>
-                              )}
-
-                              {/* Dietary Icons */}
-                              <div className="flex gap-3 pt-2">
-                                {item.isVegetarian && (
-                                  <div className="flex items-center gap-1 text-xs text-green-600">
-                                    <Leaf className="w-4 h-4" />
-                                    <span className="font-sans">
-                                      {language === "pt" ? "Vegetariano" : "Vegetarian"}
-                                    </span>
-                                  </div>
-                                )}
-                                {item.isVegan && (
-                                  <div className="flex items-center gap-1 text-xs text-green-700">
-                                    <Leaf className="w-4 h-4 fill-current" />
-                                    <span className="font-sans">
-                                      {language === "pt" ? "Vegano" : "Vegan"}
-                                    </span>
-                                  </div>
-                                )}
-                                {item.isGlutenFree && (
-                                  <div className="flex items-center gap-1 text-xs text-amber-600">
-                                    <WheatOff className="w-4 h-4" />
-                                    <span className="font-sans">
-                                      {language === "pt" ? "Sem Glúten" : "Gluten Free"}
-                                    </span>
-                                  </div>
-                                )}
-                                {item.isSpicy && (
-                                  <div className="flex items-center gap-1 text-xs text-red-600">
-                                    <Flame className="w-4 h-4" />
-                                    <span className="font-sans">
-                                      {language === "pt" ? "Picante" : "Spicy"}
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Price */}
-                            <div className="mt-4 pt-4 border-t border-border">
-                              <span className="font-display text-2xl font-bold text-accent">
-                                {formatPrice(item.price)}
-                              </span>
-                            </div>
+              <div className="grid gap-6 md:grid-cols-2">
+                {category.items.map((item) => (
+                  <Card
+                    key={item.id}
+                    className={`overflow-hidden transition-all hover:shadow-lg ${
+                      !item.isAvailable ? "opacity-60" : ""
+                    }`}
+                  >
+                    <CardContent className="p-6 space-y-4">
+                      {/* Item Header */}
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-display text-xl font-semibold text-foreground">
+                              {item.name}
+                            </h3>
+                            {item.isFeatured && (
+                              <Star className="w-5 h-5 text-accent fill-accent" />
+                            )}
                           </div>
+                          {item.description && (
+                            <p className="font-sans text-sm text-muted-foreground leading-relaxed">
+                              {item.description}
+                            </p>
+                          )}
                         </div>
-                      </CardContent>
-                    </Card>
-                  ))
-                ) : (
-                  <p className="font-sans text-muted-foreground text-center py-8">
-                    {language === "pt"
-                      ? "Nenhum item disponível nesta categoria."
-                      : "No items available in this category."}
-                  </p>
-                )}
+                        <div className="text-right">
+                          <p className="font-display text-2xl font-bold text-accent">
+                            {formatPrice(item.price)}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Dietary Icons */}
+                      <div className="flex flex-wrap gap-2">
+                        {item.isVegetarian && (
+                          <Badge variant="secondary" className="gap-1">
+                            <Leaf className="w-3 h-3" />
+                            <span className="text-xs">Vegetariano</span>
+                          </Badge>
+                        )}
+                        {item.isVegan && (
+                          <Badge variant="secondary" className="gap-1">
+                            <Leaf className="w-3 h-3" />
+                            <span className="text-xs">Vegano</span>
+                          </Badge>
+                        )}
+                        {item.isGlutenFree && (
+                          <Badge variant="secondary" className="gap-1">
+                            <WheatOff className="w-3 h-3" />
+                            <span className="text-xs">Sem Glúten</span>
+                          </Badge>
+                        )}
+                        {item.isSpicy && (
+                          <Badge variant="destructive" className="gap-1">
+                            <Flame className="w-3 h-3" />
+                            <span className="text-xs">Picante</span>
+                          </Badge>
+                        )}
+                        {!item.isAvailable && (
+                          <Badge variant="outline" className="text-xs">
+                            Esgotado
+                          </Badge>
+                        )}
+                      </div>
+
+                      {/* Image if available */}
+                      {item.imageUrl && (
+                        <div className="rounded-lg overflow-hidden">
+                          <img
+                            src={item.imageUrl}
+                            alt={item.name}
+                            className="w-full h-48 object-cover"
+                          />
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
             </section>
           ))
         ) : (
-          <div className="text-center py-16">
-            <p className="font-sans text-lg text-muted-foreground">
-              {language === "pt"
-                ? "Menu em breve disponível."
-                : "Menu coming soon."}
-            </p>
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">Nenhum item disponível no momento.</p>
           </div>
         )}
       </main>
 
       {/* Footer */}
-      <footer className="bg-primary/10 border-t border-border mt-16">
-        <div className="container py-8 text-center space-y-2">
-          <p className="font-script text-2xl text-primary">{APP_TITLE}</p>
+      <footer className="border-t border-border bg-card/50 backdrop-blur-sm mt-12">
+        <div className="container py-6 text-center">
           <p className="font-sans text-sm text-muted-foreground">
-            Rua São Pedro, 61, Faro, Portugal
-          </p>
-          <p className="font-sans text-sm text-muted-foreground">
-            +351 926 795 721
+            {APP_TITLE} © {new Date().getFullYear()}
           </p>
         </div>
       </footer>
