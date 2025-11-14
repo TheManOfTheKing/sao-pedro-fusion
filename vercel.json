@@ -1,0 +1,18 @@
+{
+  "buildCommand": "pnpm install run build",
+  "outputDirectory": "dist",
+  "installCommand": "pnpm install --no-frozen-lockfile",
+  "framework": null,
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/serverless"
+    }
+  ],
+  "functions": {
+    "api/serverless.*": {
+      "memory": 1024,
+      "maxDuration": 10
+    }
+  }
+}
