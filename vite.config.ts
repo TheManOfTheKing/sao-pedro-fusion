@@ -12,16 +12,16 @@ export default defineConfig({
   plugins,
   resolve: {
     alias: {
-      "@": path.resolve(import.meta.dirname, "client", "src"),
+      "@": path.resolve(import.meta.dirname, "src"),
       "@shared": path.resolve(import.meta.dirname, "shared"),
       "@assets": path.resolve(import.meta.dirname, "attached_assets"),
     },
   },
   envDir: path.resolve(import.meta.dirname),
-  root: path.resolve(import.meta.dirname, "client"),
-  publicDir: path.resolve(import.meta.dirname, "client", "public"),
+  root: import.meta.dirname,  // MUDANÇA: raiz do projeto
+  publicDir: path.resolve(import.meta.dirname, "public"),  // MUDANÇA: public na raiz
   build: {
-    outDir: path.resolve(import.meta.dirname, ".dist"),
+    outDir: path.resolve(import.meta.dirname, "dist"),  // MUDANÇA: dist sem /public
     emptyOutDir: true,
   },
   server: {
