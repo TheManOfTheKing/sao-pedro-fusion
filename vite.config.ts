@@ -18,10 +18,10 @@ export default defineConfig({
     },
   },
   envDir: path.resolve(import.meta.dirname),
-  root: import.meta.dirname,  // MUDANÇA: raiz do projeto
-  publicDir: path.resolve(import.meta.dirname, "public"),  // MUDANÇA: public na raiz
+  root: import.meta.dirname,
+  publicDir: path.resolve(import.meta.dirname, "public"),
   build: {
-    outDir: path.resolve(import.meta.dirname, "dist"),  // MUDANÇA: dist sem /public
+    outDir: path.resolve(import.meta.dirname, "dist"),
     emptyOutDir: true,
   },
   server: {
