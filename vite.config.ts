@@ -18,8 +18,8 @@ export default defineConfig({
     },
   },
   envDir: path.resolve(import.meta.dirname),
-  root: import.meta.dirname,
-  publicDir: path.resolve(import.meta.dirname, "public"),
+  root: ".",
+  publicDir: "public",
   build: {
     outDir: "dist",
     emptyOutDir: true,

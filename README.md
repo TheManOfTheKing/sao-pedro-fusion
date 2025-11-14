@@ -206,7 +206,7 @@ As fontes são importadas do Google Fonts no `client/src/index.css`. Para mudar:
 
 ## 🔒 Segurança
 
-- ✅ **Autenticação Manus OAuth** para o painel admin
+- ✅ **Autenticação Supabase** para o painel admin
 - ✅ **Procedures protegidas** com tRPC
 - ✅ **Validação de dados** com Zod
 - ✅ **Row Level Security** no Supabase
