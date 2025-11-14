@@ -1,5 +1,5 @@
 {
-  "buildCommand": "pnpm install && pnpm build",
+  "buildCommand": "pnpm install run build",
   "outputDirectory": "dist",
   "installCommand": "pnpm install --no-frozen-lockfile",
   "framework": null,
